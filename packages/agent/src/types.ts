@@ -31,6 +31,43 @@ export type StreamFn = (
 ) => AssistantMessageEventStream | Promise<AssistantMessageEventStream>;
 
 /**
+ * Provider prompt-cache keepalive configuration.
+ *
+ * While a long-running tool call blocks the turn, the conversation's cached
+ * prefix goes cold and can be evicted (by TTL expiry or, on a capacity-bound
+ * cache, by LRU pressure) before the next real request. When set, the loop
+ * replays the turn's request prefix on a timer to keep that cache entry warm.
+ *
+ * See `startCacheKeepAlive` in `harness/cache-keepalive.ts`.
+ */
+export interface CacheKeepAlive {
+	/**
+	 * Stream function used to issue keepalive pings.
+	 *
+	 * It must reuse the session's `sessionId` and `cacheRetention` so pings hit
+	 * the same provider cache entry as real turns, and it must not produce
+	 * user-visible or session side effects (no transcript writes, no UI events).
+	 * It is invoked with `maxTokens: 1` and the turn's request `Context`; the
+	 * returned stream is drained and discarded.
+	 */
+	streamFn: StreamFn;
+	/** Milliseconds between pings while a tool batch executes. Must be > 0. */
+	intervalMs: number;
+	/**
+	 * Delay before the first ping. Defaults to `intervalMs`. Tool batches that
+	 * finish before this elapses fire no pings, so fast tools cost nothing.
+	 */
+	initialDelayMs?: number;
+	/** Optional observer invoked when a ping is issued. Intended for tests/metrics. */
+	onPing?: (info: { index: number }) => void;
+}
+
+export interface CacheKeepAliveHandle {
+	/** Cancel pending and in-flight pings and settle. Safe to call multiple times. */
+	stop(): Promise<void>;
+}
+
+/**
  * Configuration for how tool calls from a single assistant message are executed.
  *
  * - "sequential": each tool call is prepared, executed, and finalized before the next one starts.
@@ -257,6 +294,14 @@ export interface AgentLoopConfig extends SimpleStreamOptions {
 	 * Default: "parallel"
 	 */
 	toolExecution?: ToolExecutionMode;
+
+	/**
+	 * When set, keeps the provider prompt cache warm during tool execution by
+	 * replaying the turn's request prefix on a timer (see {@link CacheKeepAlive}).
+	 * Pings run only while a non-empty tool batch executes and stop as soon as it
+	 * completes. Omit to disable (default).
+	 */
+	cacheKeepAlive?: CacheKeepAlive;
 
 	/**
 	 * Called before a tool is executed, after arguments have been validated.

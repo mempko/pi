@@ -12,6 +12,7 @@
 
 ### Added
 
+- Added a `cacheKeepAliveIntervalMs` setting: when positive, the agent replays the request prefix every N milliseconds while a tool runs to keep the provider prompt cache warm during long tool calls. Defaults to disabled.
 - Added `ModelRuntime` as the canonical async SDK and internal model/auth facade while preserving the synchronous extension-facing `ModelRegistry` API. `ModelRuntime.create()` accepts any pi-ai `CredentialStore` through its `credentials` option.
 - Added provider-owned `/login` discovery directly from registered pi-ai providers, including ambient auth status and informational links.
 - Added file-backed dynamic catalogs in `models-store.json`, per-provider pi.dev catalog overlays, and Radius gateway support including offline migration from legacy credential-cached catalogs.

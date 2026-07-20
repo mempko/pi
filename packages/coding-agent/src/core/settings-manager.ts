@@ -125,6 +125,7 @@ export interface Settings {
 	sessionDir?: string; // Custom session storage directory (same format as --session-dir CLI flag)
 	httpProxy?: string; // Proxy URL applied as HTTP_PROXY and HTTPS_PROXY for Pi-managed HTTP clients
 	httpIdleTimeoutMs?: number; // HTTP header/body idle timeout in milliseconds; 0 disables it
+	cacheKeepAliveIntervalMs?: number; // Replay the request prefix every N ms while a tool runs to keep the provider prompt cache warm; 0/undefined disables
 	websocketConnectTimeoutMs?: number; // WebSocket connect/open handshake timeout in milliseconds; 0 disables it
 }
 
@@ -829,6 +830,10 @@ export class SettingsManager {
 		this.globalSettings.httpIdleTimeoutMs = Math.floor(timeoutMs);
 		this.markModified("httpIdleTimeoutMs");
 		this.save();
+	}
+
+	getCacheKeepAliveIntervalMs(): number | undefined {
+		return parseTimeoutSetting(this.settings.cacheKeepAliveIntervalMs, "cacheKeepAliveIntervalMs");
 	}
 
 	getProviderRetrySettings(): { timeoutMs?: number; maxRetries?: number; maxRetryDelayMs: number } {

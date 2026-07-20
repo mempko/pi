@@ -93,6 +93,12 @@ export interface AgentHarnessStreamOptions {
 	metadata?: SimpleStreamOptions["metadata"];
 	/** Provider cache retention hint. */
 	cacheRetention?: SimpleStreamOptions["cacheRetention"];
+	/**
+	 * When set to a positive value, keeps the provider prompt cache warm during
+	 * tool execution by replaying the turn's request prefix every this-many
+	 * milliseconds (minimal generation, discarded). Omit or set to 0 to disable.
+	 */
+	cacheKeepAliveIntervalMs?: number;
 }
 
 /** Per-request stream option patch returned by provider hooks. */

@@ -1,0 +1,5 @@
+idle anthropic_baseline anthropic_keepalive deepseek_baseline deepseek_keepalive google_baseline google_keepalive openai_baseline openai_keepalive
+0 99.98 99.98 99.94 99.94 98.09 98.09 99.36 99.36
+60 99.98 99.98 99.94 99.93 98.09 98.08 99.36 99.36
+300 99.98 99.98 99.94 99.93 98.08 98.08 99.36 99.36
+600 0.00 99.98 0.19 99.93 98.08 98.08 99.36 99.36

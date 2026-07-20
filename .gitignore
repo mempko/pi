@@ -11,6 +11,7 @@ packages/*/dist-firefox/
 
 # Environment
 .env
+scripts/cache-keepalive/secret.env
 
 # Editor files
 .vscode/
@@ -39,3 +40,16 @@ plans/
 .pi/hf-sessions/
 .pi/hf-sessions-backup/
 collect.sh
+scripts/cache-research/secret.env
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.pdf
+paper/*.bbl
+paper/*.blg
+paper/*.synctex.gz
+blog/post.built.html
+blog/img/
+
+# Local Claude launcher; contains credentials, never commit
+claude.sh

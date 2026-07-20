@@ -1,0 +1,8 @@
+\addplot[vcanthropic, dashed, mark=o, mark size=1.4pt] table[x=idle, y=anthropic_baseline] {data/cost-40000.dat}; \addlegendentry{Anthropic base}
+\addplot[vcanthropic, thick, mark=*, mark size=1.4pt] table[x=idle, y=anthropic_keepalive] {data/cost-40000.dat}; \addlegendentry{Anthropic KA}
+\addplot[vcdeepseek, dashed, mark=diamond, mark size=1.4pt] table[x=idle, y=deepseek_baseline] {data/cost-40000.dat}; \addlegendentry{DeepSeek base}
+\addplot[vcdeepseek, thick, mark=diamond*, mark size=1.4pt] table[x=idle, y=deepseek_keepalive] {data/cost-40000.dat}; \addlegendentry{DeepSeek KA}
+\addplot[vcgoogle, dashed, mark=square, mark size=1.4pt] table[x=idle, y=google_baseline] {data/cost-40000.dat}; \addlegendentry{Google base}
+\addplot[vcgoogle, thick, mark=square*, mark size=1.4pt] table[x=idle, y=google_keepalive] {data/cost-40000.dat}; \addlegendentry{Google KA}
+\addplot[vcopenai, dashed, mark=triangle, mark size=1.4pt] table[x=idle, y=openai_baseline] {data/cost-40000.dat}; \addlegendentry{OpenAI base}
+\addplot[vcopenai, thick, mark=triangle*, mark size=1.4pt] table[x=idle, y=openai_keepalive] {data/cost-40000.dat}; \addlegendentry{OpenAI KA}

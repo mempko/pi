@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added prompt-cache keepalive: while a tool batch runs, the agent loop can replay the turn's request prefix on a timer (minimal generation, discarded) to keep the provider prompt cache warm and avoid TTL/LRU eviction before the next request. Configure via `AgentLoopConfig.cacheKeepAlive`, `Agent`'s `cacheKeepAliveIntervalMs`/`cacheRetention` options, or `AgentHarnessStreamOptions.cacheKeepAliveIntervalMs`. New `startCacheKeepAlive` helper exported.
+
 ## [0.80.7] - 2026-07-14
 
 ### Added

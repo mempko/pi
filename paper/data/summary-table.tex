@@ -1,0 +1,35 @@
+\begin{table}[t]
+\centering\footnotesize
+\caption{Fraction of samples whose post-idle \texttt{reqB} was warm (cache hit $\geq 90\%$), baseline vs.\ keepalive. Only cells passing all measurement-integrity gates are counted; conditions were collected in separate time blocks.}
+\label{tab:summary}
+\begin{tabular}{llrrr}
+\toprule
+Provider & Size & Idle & Warm$_{base}$ & Warm$_{ka}$ \\
+\midrule
+Anthropic & 40k & 60 & 24/24 & 24/24 \\
+Anthropic & 40k & 300 & 24/24 & 21/21 \\
+Anthropic & 40k & 600 & 0/24 & 20/20 \\
+Anthropic & 100k & 60 & 24/24 & 24/24 \\
+Anthropic & 100k & 300 & 24/24 & 19/19 \\
+Anthropic & 100k & 600 & 0/24 & 20/20 \\
+DeepSeek & 40k & 60 & 20/24 & 20/24 \\
+DeepSeek & 40k & 300 & 16/23 & 21/21 \\
+DeepSeek & 40k & 600 & 3/24 & 21/21 \\
+DeepSeek & 100k & 60 & 17/24 & 19/24 \\
+DeepSeek & 100k & 300 & 20/24 & 21/23 \\
+DeepSeek & 100k & 600 & 1/24 & 21/21 \\
+Google & 40k & 60 & 12/12 & 6/7 \\
+Google & 40k & 300 & 7/12 & 5/5 \\
+Google & 40k & 600 & 11/12 & 6/6 \\
+Google & 100k & 60 & 8/12 & 7/7 \\
+Google & 100k & 300 & 8/12 & 5/5 \\
+Google & 100k & 600 & 9/12 & 3/3 \\
+OpenAI & 40k & 60 & 24/24 & 24/24 \\
+OpenAI & 40k & 300 & 22/24 & 20/21 \\
+OpenAI & 40k & 600 & 20/24 & 23/23 \\
+OpenAI & 100k & 60 & 24/24 & 24/24 \\
+OpenAI & 100k & 300 & 23/24 & 24/24 \\
+OpenAI & 100k & 600 & 19/24 & 23/23 \\
+\bottomrule
+\end{tabular}
+\end{table}

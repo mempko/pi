@@ -1,4 +1,5 @@
 import {
+	type CacheRetention,
 	type ImageContent,
 	type Message,
 	type Model,
@@ -118,6 +119,14 @@ export interface AgentOptions {
 	transport?: Transport;
 	maxRetryDelayMs?: number;
 	toolExecution?: ToolExecutionMode;
+	/** Provider cache retention hint forwarded to the stream function. */
+	cacheRetention?: CacheRetention;
+	/**
+	 * When set to a positive value, keeps the provider prompt cache warm during
+	 * tool execution by replaying the turn's request prefix every this-many
+	 * milliseconds (minimal generation, discarded). Omit or set to 0 to disable.
+	 */
+	cacheKeepAliveIntervalMs?: number;
 }
 
 class PendingMessageQueue {
@@ -206,6 +215,10 @@ export class Agent {
 	public maxRetryDelayMs?: number;
 	/** Tool execution strategy for assistant messages that contain multiple tool calls. */
 	public toolExecution: ToolExecutionMode;
+	/** Provider cache retention hint forwarded to the stream function. */
+	public cacheRetention?: CacheRetention;
+	/** Interval in ms for prompt-cache keepalive pings during tool execution. 0/undefined disables. */
+	public cacheKeepAliveIntervalMs?: number;
 
 	constructor(options: AgentOptions = {}) {
 		this._state = createMutableAgentState(options.initialState);
@@ -226,6 +239,8 @@ export class Agent {
 		this.transport = options.transport ?? "auto";
 		this.maxRetryDelayMs = options.maxRetryDelayMs;
 		this.toolExecution = options.toolExecution ?? "parallel";
+		this.cacheRetention = options.cacheRetention;
+		this.cacheKeepAliveIntervalMs = options.cacheKeepAliveIntervalMs;
 	}
 
 	/**
@@ -435,12 +450,31 @@ export class Agent {
 			model: this._state.model,
 			reasoning: this._state.thinkingLevel === "off" ? undefined : this._state.thinkingLevel,
 			sessionId: this.sessionId,
+			cacheRetention: this.cacheRetention,
 			onPayload: this.onPayload,
 			onResponse: this.onResponse,
 			transport: this.transport,
 			thinkingBudgets: this.thinkingBudgets,
 			maxRetryDelayMs: this.maxRetryDelayMs,
 			toolExecution: this.toolExecution,
+			cacheKeepAlive:
+				this.cacheKeepAliveIntervalMs && this.cacheKeepAliveIntervalMs > 0
+					? {
+							// Reuse the main stream function so pings inherit auth/header
+							// handling, but with a minimal options object: no onPayload/
+							// onResponse hooks fire and no thinking budget is spent. Reuse
+							// sessionId + cacheRetention so pings hit the same cache entry.
+							streamFn: (model, context, streamOptions) =>
+								this.streamFn(model, context, {
+									sessionId: this.sessionId,
+									cacheRetention: this.cacheRetention,
+									transport: this.transport,
+									maxTokens: streamOptions?.maxTokens,
+									signal: streamOptions?.signal,
+								}),
+							intervalMs: this.cacheKeepAliveIntervalMs,
+						}
+					: undefined,
 			beforeToolCall: this.beforeToolCall,
 			afterToolCall: this.afterToolCall,
 			prepareNextTurn:

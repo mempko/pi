@@ -91,6 +91,8 @@ function applyStreamOptionsPatch(
 	if (Object.hasOwn(patch, "maxRetries")) result.maxRetries = patch.maxRetries;
 	if (Object.hasOwn(patch, "maxRetryDelayMs")) result.maxRetryDelayMs = patch.maxRetryDelayMs;
 	if (Object.hasOwn(patch, "cacheRetention")) result.cacheRetention = patch.cacheRetention;
+	if (Object.hasOwn(patch, "cacheKeepAliveIntervalMs"))
+		result.cacheKeepAliveIntervalMs = patch.cacheKeepAliveIntervalMs;
 
 	if (Object.hasOwn(patch, "headers")) {
 		if (patch.headers === undefined) {
@@ -384,6 +386,29 @@ export class AgentHarness<
 		};
 	}
 
+	/**
+	 * Stream function used for prompt-cache keepalive pings. Unlike
+	 * {@link createStreamFn} it emits no provider-lifecycle events and spends no
+	 * thinking budget, but reuses the turn's `sessionId` and `cacheRetention` so
+	 * pings hit the same cache entry as real turns. Called with `maxTokens: 1`.
+	 */
+	private createKeepAliveStreamFn(
+		getTurnState: () => AgentHarnessTurnState<TSkill, TPromptTemplate, TTool>,
+	): StreamFn {
+		return (model, context, streamOptions) => {
+			const turnState = getTurnState();
+			return this.models.streamSimple(model, context, {
+				cacheRetention: turnState.streamOptions.cacheRetention,
+				headers: turnState.streamOptions.headers,
+				transport: turnState.streamOptions.transport,
+				timeoutMs: turnState.streamOptions.timeoutMs,
+				sessionId: turnState.sessionId,
+				maxTokens: streamOptions?.maxTokens,
+				signal: streamOptions?.signal,
+			});
+		};
+	}
+
 	private async drainQueuedMessages(queue: AgentMessage[], mode: QueueMode): Promise<AgentMessage[]> {
 		const messages = mode === "all" ? queue.splice(0) : queue.splice(0, 1);
 		if (messages.length === 0) return messages;
@@ -401,10 +426,15 @@ export class AgentHarness<
 		setTurnState: (turnState: AgentHarnessTurnState<TSkill, TPromptTemplate, TTool>) => void,
 	): AgentLoopConfig {
 		const turnState = getTurnState();
+		const keepAliveIntervalMs = turnState.streamOptions.cacheKeepAliveIntervalMs;
 		return {
 			model: turnState.model,
 			reasoning: turnState.thinkingLevel === "off" ? undefined : turnState.thinkingLevel,
 			convertToLlm,
+			cacheKeepAlive:
+				keepAliveIntervalMs && keepAliveIntervalMs > 0
+					? { streamFn: this.createKeepAliveStreamFn(getTurnState), intervalMs: keepAliveIntervalMs }
+					: undefined,
 			transformContext: async (messages) => {
 				const result = await this.emitHook({ type: "context", messages: [...messages] });
 				return result?.messages ?? messages;

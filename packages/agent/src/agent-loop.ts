@@ -11,6 +11,7 @@ import {
 	type ToolResultMessage,
 	validateToolArguments,
 } from "@earendil-works/pi-ai/compat";
+import { startCacheKeepAlive } from "./harness/cache-keepalive.ts";
 import type {
 	AgentContext,
 	AgentEvent,
@@ -190,7 +191,7 @@ async function runLoop(
 			}
 
 			// Stream assistant response
-			const message = await streamAssistantResponse(currentContext, config, signal, emit, streamFn);
+			const { message, llmContext } = await streamAssistantResponse(currentContext, config, signal, emit, streamFn);
 			newMessages.push(message);
 
 			if (message.stopReason === "error" || message.stopReason === "aborted") {
@@ -205,13 +206,25 @@ async function runLoop(
 			const toolResults: ToolResultMessage[] = [];
 			hasMoreToolCalls = false;
 			if (toolCalls.length > 0) {
-				// A "length" stop means the output was cut off by the token limit, so
-				// every tool call in the message may carry truncated arguments. Fail
-				// them all instead of executing potentially borked calls.
-				const executedToolBatch =
-					message.stopReason === "length"
-						? await failToolCallsFromTruncatedMessage(toolCalls, emit)
-						: await executeToolCalls(currentContext, message, config, signal, emit);
+				let executedToolBatch: ExecutedToolCallBatch;
+				if (message.stopReason === "length") {
+					// A "length" stop means the output was cut off by the token limit, so
+					// every tool call in the message may carry truncated arguments. Fail
+					// them all instead of executing potentially borked calls.
+					executedToolBatch = await failToolCallsFromTruncatedMessage(toolCalls, emit);
+				} else {
+					// Keep the provider prompt cache warm while tools run: replay the
+					// turn's request prefix (`llmContext`) on a timer so the cached
+					// prefix is not evicted before the post-tool request.
+					const keepAlive = config.cacheKeepAlive
+						? startCacheKeepAlive(config.cacheKeepAlive, config.model, llmContext, signal)
+						: undefined;
+					try {
+						executedToolBatch = await executeToolCalls(currentContext, message, config, signal, emit);
+					} finally {
+						await keepAlive?.stop();
+					}
+				}
 				toolResults.push(...executedToolBatch.messages);
 				hasMoreToolCalls = !executedToolBatch.terminate;
 
@@ -284,7 +297,7 @@ async function streamAssistantResponse(
 	signal: AbortSignal | undefined,
 	emit: AgentEventSink,
 	streamFn?: StreamFn,
-): Promise<AssistantMessage> {
+): Promise<{ message: AssistantMessage; llmContext: Context }> {
 	// Apply context transform if configured (AgentMessage[] → AgentMessage[])
 	let messages = context.messages;
 	if (config.transformContext) {
@@ -357,7 +370,7 @@ async function streamAssistantResponse(
 					await emit({ type: "message_start", message: { ...finalMessage } });
 				}
 				await emit({ type: "message_end", message: finalMessage });
-				return finalMessage;
+				return { message: finalMessage, llmContext };
 			}
 		}
 	}
@@ -370,7 +383,7 @@ async function streamAssistantResponse(
 		await emit({ type: "message_start", message: { ...finalMessage } });
 	}
 	await emit({ type: "message_end", message: finalMessage });
-	return finalMessage;
+	return { message: finalMessage, llmContext };
 }
 
 /**
