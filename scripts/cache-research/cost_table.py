@@ -113,11 +113,16 @@ for v in vendors:
 lines = [
     "\\begin{table*}[t]",
     "\\centering\\footnotesize",
-    "\\caption{Measured whole-strategy cost at the longest idle gap (reqA $+$ pings $+$ reqB, "
-    "median, with warm rate): letting the cache die and re-prefilling (baseline) versus the "
-    "30\\,s keepalive convention and the economical $\\tau^{\\ast}\\approx 240\\,s$ prescription. "
-    "The 30\\,s keepalive loses money at this gap on every provider; the 240\\,s keepalive keeps "
-    "the warmth benefit at a fraction of the ping spend. Valid cells only.}",
+    f"\\caption{{Measured whole-strategy cost at a \\textbf{{{args.idle//60}-minute}} pause "
+    f"(idle ${args.idle}$\\,s; reqA $+$ pings $+$ reqB, median, with warm rate): letting the "
+    "cache die and re-prefilling (baseline) versus the 30\\,s keepalive convention and the "
+    "economical $\\tau^{\\ast}\\approx 240\\,s$ prescription. Baseline and 30\\,s columns pool "
+    "the three matrix replicates ($n$ up to 24); the 240\\,s column is a separate "
+    "interval-validation run ($n{=}4$ per cell). At this gap only Anthropic and "
+    "DeepSeek have evicted (OpenAI and Google are still warm at baseline, so their keepalive "
+    "columns are insurance against nothing); Table~\\ref{tab:bands} re-runs the comparison at "
+    "30 minutes, past every eviction point. The 30\\,s convention loses money here on every "
+    "provider. Valid cells only.}",
     "\\label{tab:strategy}",
     "\\begin{tabular}{ll rrr rrr rrr}",
     "\\toprule",

@@ -1,6 +1,6 @@
 \begin{table*}[t]
 \centering\footnotesize
-\caption{Measured whole-strategy cost at the longest idle gap (reqA $+$ pings $+$ reqB, median, with warm rate): letting the cache die and re-prefilling (baseline) versus the 30\,s keepalive convention and the economical $\tau^{\ast}\approx 240\,s$ prescription. The 30\,s keepalive loses money at this gap on every provider; the 240\,s keepalive keeps the warmth benefit at a fraction of the ping spend. Valid cells only.}
+\caption{Measured whole-strategy cost at a \textbf{10-minute} pause (idle $600$\,s; reqA $+$ pings $+$ reqB, median, with warm rate): letting the cache die and re-prefilling (baseline) versus the 30\,s keepalive convention and the economical $\tau^{\ast}\approx 240\,s$ prescription. Baseline and 30\,s columns pool the three matrix replicates ($n$ up to 24); the 240\,s column is a separate interval-validation run ($n{=}4$ per cell). At this gap only Anthropic and DeepSeek have evicted (OpenAI and Google are still warm at baseline, so their keepalive columns are insurance against nothing); Table~\ref{tab:bands} re-runs the comparison at 30 minutes, past every eviction point. The 30\,s convention loses money here on every provider. Valid cells only.}
 \label{tab:strategy}
 \begin{tabular}{ll rrr rrr rrr}
 \toprule
@@ -12,8 +12,8 @@ Anthropic & 40k & \$0.267 & 0/24 & 1654\,ms & \$0.347 & 24/24 & 1240\,ms & \$0.1
 Anthropic & 100k & \$0.667 & 0/24 & 2285\,ms & \$0.867 & 24/24 & 1453\,ms & \$0.414 & 4/4 & 1332\,ms \\
 DeepSeek & 40k & \$0.017 & 3/24 & 2332\,ms & \$0.100 & 25/25 & 1039\,ms & \$0.022 & 4/4 & 1388\,ms \\
 DeepSeek & 100k & \$0.043 & 1/24 & 5398\,ms & \$0.249 & 25/25 & 1382\,ms & \$0.060 & 3/4 & 1950\,ms \\
-Google & 40k & \$0.053 & 11/12 & 1846\,ms & \$0.276 & 6/6 & 3295\,ms & -- & -- & -- \\
-Google & 100k & \$0.131 & 9/12 & 3952\,ms & \$0.649 & 3/3 & 1783\,ms & -- & -- & -- \\
+Google & 40k & \$0.053 & 11/12 & 1846\,ms & \$0.291 & 10/10 & 1429\,ms & \$0.090 & 3/4 & 2117\,ms \\
+Google & 100k & \$0.131 & 9/12 & 3952\,ms & \$0.649 & 7/7 & 1800\,ms & \$0.186 & 3/4 & 2561\,ms \\
 OpenAI & 40k & \$0.046 & 20/24 & 1007\,ms & \$0.130 & 27/27 & 901\,ms & \$0.055 & 4/4 & 1074\,ms \\
 OpenAI & 100k & \$0.115 & 19/24 & 1135\,ms & \$0.317 & 27/27 & 1051\,ms & \$0.136 & 4/4 & 1508\,ms \\
 \bottomrule

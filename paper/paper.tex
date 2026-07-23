@@ -63,10 +63,14 @@ cutting the post-pause request cost by up to \bestSavingRatio{}. The strategic
 question is the ping \emph{frequency}, and it has a clean answer: keepalive
 cost falls monotonically in the interval, so the economical choice is the
 largest interval safely under the provider's TTL, about 4 minutes at
-Anthropic's 5-minute TTL rather than the 30-second convention, and the strategy
-breaks even against a re-prefill at idle ${\approx}\,\tau(w/r-1)$
-(${\approx}46$\,min for Anthropic, ${\approx}36$\,min for OpenAI and DeepSeek).
-Because the benefit is real and bounded only by each user's own bill, rational
+Anthropic's 5-minute TTL rather than the 30-second convention. The keepalive
+saves inside a \emph{paying band} bounded below by the provider's measured
+eviction point and above by $I_{\max}\approx\tau(w/r-1)$. We locate each
+eviction point (Anthropic ${\sim}5$, DeepSeek ${\sim}10$, OpenAI ${\sim}30$
+minutes; Google never converges) and confirm at a 30-minute pause that the
+keepalive saves on Anthropic \emph{and} OpenAI, while DeepSeek's re-prefill is
+too cheap to insure and Google never reliably evicts, leaving those two a
+latency win only. Because the benefit is real and bounded only by each user's own bill, rational
 adoption is universal adoption; and since cache residency is priced per read
 rather than per token-hour, a keepalive-saturated tier gives LRU eviction
 nothing to rank. We argue this externality will push providers to meter cache
@@ -114,10 +118,14 @@ baseline went 0/48 warm across three runs, the keepalive held 40/40
 Keepalive cost falls monotonically in the interval, so the optimum is the
 largest interval safely under the TTL: ${\sim}4$\,min at Anthropic, an $8\times$
 reduction in keepalive spend (\S\ref{sec:economics}).
-\item \textbf{How far does the benefit extend?} To idle
-${\approx}\,\tau(w/r-1)$, about 46\,min at Anthropic's prices. Past that,
-warmth costs more than the re-prefill it prevents; below the TTL it buys
-nothing (\S\ref{sec:economics}).
+\item \textbf{Which providers, and for how long a pause?} The keepalive saves
+inside a \emph{paying band}: longer than the provider's eviction point, shorter
+than $I_{\max} \approx \tau(w/r-1)$. We measure the eviction points (Anthropic
+${\sim}5$\,min, DeepSeek ${\sim}10$\,min, OpenAI ${\sim}30$\,min, Google never)
+and confirm the savings at a 30-minute pause: the keepalive saves on Anthropic
+\emph{and} OpenAI, not Anthropic alone. DeepSeek's re-prefill is too cheap to
+insure and Google's cache never reliably evicts, so for those two the keepalive
+buys only latency (\S\ref{sec:economics}).
 \item \textbf{What happens when everyone does it?} The incentive is individual
 and immediate, so adoption is rational; but cache residency is priced per read,
 not per token-hour, so a keepalive-saturated tier degrades for everyone. We
@@ -206,7 +214,8 @@ the identical prefix, streamed to capture time-to-first-token. Anthropic,
 OpenAI, and Google are queried first-party (Anthropic Messages API with an
 explicit ephemeral breakpoint; OpenAI Chat Completions with
 \texttt{prompt\_cache\_key} set to the cell salt; Gemini with implicit
-caching). DeepSeek is queried via OpenRouter pinned to a single backend
+caching). DeepSeek is queried via OpenRouter~\cite{openrouter,openrouter-caching}
+pinned to a single backend
 (DeepInfra); the pin is endpoint-level, so the served backend is recorded on
 every call and any cell whose backend changes mid-cell is discarded.
 
@@ -233,7 +242,14 @@ reported both per-request (reqB) and whole-cell (reqA${}+{}$pings${}+{}$reqB).
 \paragraph{Matrix and statistics.}
 We test \dataVendorsNice{} at \dataSizes{} tokens, idle gaps of
 \{\dataIdles\}\,s, $n{=}8$ samples per cell per run, in three independent
-runs separated by 30 minutes to hours. The data is bimodal (a prefix is essentially warm
+runs separated by 30 minutes to hours. Two follow-up experiments extend the
+matrix: a \emph{retention sweep} (baseline-only, no keepalive, 100k prefix,
+idle gaps of $360$--$540$\,s bisecting Anthropic's cliff and $900$--$2400$\,s
+locating the later eviction points, $n{=}6$ per cell) and a \emph{paying-band
+run} (baseline vs.\ $\tau^{\ast}{=}240$\,s keepalive at an $1800$\,s idle,
+$n{=}8$, Google excluded since the sweep shows it has no eviction point). Both
+use the same transports, validity gates, and warm-reference checks as the
+matrix. The data is bimodal (a prefix is essentially warm
 or evicted), so we report the \emph{warm rate}: the fraction of valid samples
 whose reqB cached ${\geq}90\%$ of prompt tokens. Samples within a run share one
 moment's tier conditions, so the run is the unit of independence: per-run
@@ -252,7 +268,8 @@ it holds in every run.
 \begin{tikzpicture}
 \begin{axis}[
   width=\linewidth, height=4.9cm,
-  xlabel={Idle (s)}, xmin=0, xtick={0,60,300,600},
+  xlabel={Idle (s)}, xmin=0, xtick={0,600,1800},
+  x tick label style={font=\scriptsize},
   ymin=-4, ymax=106, ytick={0,50,100},
   grid=both, grid style={gray!18}, tick label style={font=\scriptsize},
   label style={font=\scriptsize}, unbounded coords=jump,
@@ -266,15 +283,19 @@ it holds in every run.
 \warmpanel{}{OpenAI}{data/plot-warm-100000-openai.tex}\hfill
 \warmpanel{}{Google}{data/plot-warm-100000-google.tex}
 \\[2pt]
-{\footnotesize \textcolor{black!70}{dashed: idle baseline \qquad \rule[0.5ex]{1.2em}{0.8pt}\, solid: keepalive (30\,s)}}
+{\footnotesize \textcolor{black!70}{dashed: idle baseline \qquad \rule[0.5ex]{1.2em}{0.8pt}\, solid: keepalive ($30$\,s pings through $600$\,s; $\tau^{\ast}{=}240$\,s at $1800$\,s)}}
 \caption{\textbf{Per-provider warm rate vs.\ idle} (fraction of valid samples
 whose post-idle reqB cached ${\geq}90\%$ of prompt tokens; 100k prefix; 40k
-shows the same pattern on Anthropic, DeepSeek, and OpenAI). The three regimes
-read off directly: Anthropic's baseline
-collapses at 600\,s (hard TTL) while the keepalive holds; DeepSeek's baseline
-is lossy at every gap; OpenAI's and Google's baselines barely need defending.
-Google's keepalive points are $n{=}3$--$6$ (quota-limited); all other points
-are up to $n{=}24$ across three runs.}
+shows the same pattern on Anthropic, DeepSeek, and OpenAI; the $1800$\,s points
+come from the paying-band run of Table~\ref{tab:bands}). Anthropic's baseline
+collapses at $600$\,s (hard TTL) and DeepSeek's by $600$\,s; OpenAI's survives
+$600$\,s and is gone by $1800$\,s; Google's never converges
+(Fig.~\ref{fig:retention} has the full baseline sweep, including the gaps
+between $600$ and $1800$\,s). The keepalive holds every provider at every
+measured gap. Google was excluded from the $1800$\,s strategy run (no eviction
+point, so no band to test); its keepalive points are $n{=}3$--$6$
+(quota-limited); other points are up to $n{=}24$ across three runs, $n{=}8$ at
+$1800$\,s.}
 \label{fig:hit}
 \end{figure*}
 
@@ -290,20 +311,61 @@ the keepalive holds 42/42, but short-idle samples show scatter we attribute to
 machine-level routing inside the pinned endpoint, including occasional
 keepalive misses at 60\,s that first-party providers did not produce; an
 endpoint pin is not a machine pin, and a ping can warm one machine while reqB
-lands on another. \emph{Sticky cache} (OpenAI, Google): baselines survive
-600\,s in most samples (OpenAI 39/48; Google 20/24 across its two completed
-runs), so at these gaps there is little to defend and the keepalive's role is
-variance removal. Google's implicit cache also carries the one diurnal signal
-in our data: its 600\,s baseline was 12/16 in the peak-evening run and 8/8 in
-the off-peak night run, matching the ``longer off-peak'' behavior OpenAI
-documents for its own cache. At 60--300\,s, Anthropic and OpenAI baselines are
-fully or nearly fully warm, while DeepInfra and Google already lose a third or
-more of samples at 300\,s in the peak run. Our strict bar (Fisher exact per run, Bonferroni over the 24
-comparisons, required in every run) is met by Anthropic at both sizes and
-DeepSeek at 100k; DeepSeek at 40k shows the same pooled separation but falls
-one run short of the per-run bar. Across all providers, sizes, and idles the
+lands on another. \emph{Slow cache} (OpenAI): its baseline survives
+600\,s in most samples (39/48); it does evict, but on a longer timescale than
+this window shows (\S\ref{sec:retention}). \emph{Lottery cache} (Google): its warm rate never
+converges to warm or cold, sitting at 33--83\% at every gap
+(\S\ref{sec:retention}); with no affinity lever and a commit delay, a Gemini
+hit is a routing probability rather than a retention state. Google's one clean
+signal is diurnal: its 600\,s baseline was 12/16 in the peak-evening run and
+8/8 in the off-peak night run. Across all providers, sizes, and idles the
 keepalive's median cache hit is ${\geq}\keepaliveMinHit\%$, and the ping logs
-show the schedule was actually kept (median ping drift ${<}0.2$\,s).
+show the schedule was actually kept (median ping drift ${<}0.2$\,s). Our strict
+bar (Fisher exact per run, Bonferroni over the 24 comparisons, required in
+every run) is met by Anthropic at both sizes and DeepSeek at 100k; DeepSeek at
+40k shows the same pooled separation but falls one run short of the per-run bar.
+
+\subsection{Where each cache actually dies}
+\label{sec:retention}
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[width=\linewidth, height=5.4cm, xlabel={Idle time (s)},
+  ylabel={Baseline warm (\%)}, ymin=-4, ymax=106, xmin=0, xmax=2450,
+  xtick={0,300,600,1200,1800,2400}, x tick label style={font=\scriptsize,rotate=45,anchor=east},
+  ytick={0,50,100}, tick label style={font=\scriptsize}, label style={font=\footnotesize},
+  grid=both, grid style={gray!18}, unbounded coords=jump,
+  legend style={font=\tiny, at={(0.5,-0.42)}, anchor=north, legend columns=4}]
+\input{data/retention-plot.tex}
+\end{axis}
+\end{tikzpicture}
+\caption{\textbf{Retention curve: idle baseline warm rate out to 40 minutes}
+(no keepalive, 100k prefix). No cache evicted before its documented TTL:
+Anthropic falls off a cliff between $300$ and $360$\,s (its 5-minute TTL, no
+grace period), DeepSeek collapses by $540$--$600$\,s, and OpenAI outlives its
+documented 5--10 minutes, decaying gradually to fully cold by $1800$\,s.
+Google never converges (a routing lottery, not a retention curve). A study
+confined to gaps of $600$\,s or less would classify OpenAI as never-evicting;
+its eviction point simply lies beyond that window.}
+\label{fig:retention}
+\end{figure}
+
+The efficacy matrix measures whether the keepalive holds; the retention sweep
+(Figure~\ref{fig:retention}) answers the prior question of when holding is even
+needed: how long does an idle cache survive on its own? Sweeping baselines out
+to $40$ minutes locates each provider's eviction point. Two facts fall out.
+First, \emph{no cache evicted before its documented TTL, and none is
+guaranteed past it}: Anthropic held $100\%$ at $300$\,s and was gone at
+$360$\,s (its 5-minute TTL enforced with no grace period); DeepSeek held
+through its window and collapsed by $10$ minutes; OpenAI outlived its
+documented ``5--10 minutes'' (still ${\sim}50\%$ warm at $15$--$20$ minutes)
+before going fully cold by $30$. The documented TTL is thus exactly what a
+client may rely on and no more: warmth below it held everywhere we measured,
+warmth above it is a provider-specific bonus that cannot be planned around.
+The safe default without measuring is the documented TTL minus a margin. Second, OpenAI
+is not the exception to the keepalive's value; it is a delayed instance of it.
+Its cache does die, so past its eviction point there is a re-prefill to
+insure against, and the keepalive can pay (\S\ref{sec:economics}).
 
 \subsection{Keepalive economics: frequency and horizon}
 \label{sec:economics}
@@ -332,38 +394,53 @@ Break-even against re-prefill is $I_{\max} = \tau\,(w/r - 1)$:
 ${\approx}46$\,min for Anthropic's 5-minute tier at $\tau^{\ast}$,
 ${\approx}36$\,min for OpenAI and DeepSeek, and only ${\approx}12$\,min for
 Google, whose implicit cache reads at $0.25\times$ rather than $0.1\times$
-(Table~\ref{tab:params}). Below the TTL the keepalive buys nothing (the
-baseline survives anyway); past $I_{\max}$ it costs more than the eviction it
-prevents. Table~\ref{tab:strategy} shows this directly at our 600\,s gap: on
-the post-pause request alone the keepalive is up to \bestSavingRatio{} cheaper
-(\bestSavingDesc{}), but \emph{net of its own pings} the 30\,s keepalive costs
-more than the cold re-prefill on every provider and size where both arms were
-measured, because $I_{\max}$ at 30\,s is
-only ${\approx}6$\,min. The $\tau^{\ast}{\approx}240$\,s arm cuts ping spend
-$7.8\times$ against the 30\,s arm (measured) while holding 23 of 24 samples
-warm (the one miss on the lossy DeepInfra endpoint),
-and the net savings materialize exactly where the formula says they should:
-$1.6\times$ on Anthropic at both sizes (hard TTL, $1.25\times$ write premium),
-but not on DeepSeek ($0.7$--$0.8\times$; its re-prefill is too cheap to insure)
-or OpenAI ($0.84\times$; nothing to insure against in this window). Paid
-long-TTL tiers raise the ceiling into the hours: Anthropic's
-1-hour tier breaks even against a $1.25\times$ re-prefill at ${\sim}3.3$\,h net
-of its write premium. No configuration makes indefinite warmth economical: the
-rent always exceeds the re-prefill eventually.
+(Table~\ref{tab:params}). The keepalive saves inside a \emph{paying band}: an idle longer than the
+provider's eviction point (or there is nothing to insure) but shorter than
+$I_{\max}$ (or the pings exceed the re-prefill). Each provider's band follows
+from its measured eviction point (\S\ref{sec:retention}) and its $I_{\max}$:
+Anthropic ${\sim}6$--$46$\,min; OpenAI ${\sim}25$--$35$\,min against full
+eviction, though its decay is gradual (half the samples are already cold at
+$15$--$20$\,min, so in expectation the band opens earlier); DeepSeek
+${\sim}10$--$36$\,min but with a re-prefill too cheap to be worth insuring; and
+Google empty (no eviction point, so no band).
+
+Two of our runs probe this band structure. \emph{At 600\,s}
+(Table~\ref{tab:strategy}), only Anthropic and DeepSeek have evicted, so only
+they have anything to insure; and even there the $30$\,s convention loses money
+net of pings (its $I_{\max}$ at $30$\,s is only ${\approx}6$\,min), while the
+$\tau^{\ast}{=}240$\,s arm cuts ping spend $7.8\times$ and saves $1.6\times$ on
+Anthropic. A study confined to this gap would conclude the keepalive pays only
+on Anthropic; that conclusion is an artifact of the gap, not a property of the
+providers. \emph{At 1800\,s} (Table~\ref{tab:bands}), inside every evicting
+provider's band, Anthropic, OpenAI, \emph{and} DeepSeek
+are all fully cold at baseline, and the $\tau^{\ast}$ keepalive saves
+$1.56\times$ on Anthropic and $1.23\times$ on OpenAI. DeepSeek is the honest
+exception: it evicts, but its cold re-prefill costs \$0.022, so seven pings cost
+more than the eviction they prevent ($0.20\times$), a cost loss at every gap.
+Its keepalive is a latency play, never a money one. The headline is therefore
+not ``only Anthropic saves'' but ``every provider whose re-prefill is worth
+insuring saves inside its measured band.'' Paid long-TTL tiers raise the ceiling
+into the hours; no configuration makes indefinite warmth economical.
 
 \IfFileExists{data/cost-table.tex}{\input{data/cost-table.tex}}{}
+\IfFileExists{data/bands-table.tex}{\input{data/bands-table.tex}}{}
 
 \paragraph{Latency: the unqualified win.}
-Cost is the bounded benefit; latency is not. At 600\,s, warm reqB TTFT beats
-the cold re-prefill on every provider where eviction occurs (Table~\ref{tab:strategy}):
-${\sim}0.8$\,s faster on a 100k Anthropic prefix and ${\sim}4$\,s on 100k
-DeepSeek. For interactive agents, this alone can justify the keepalive even
-past $I_{\max}$.
+Cost is the bounded benefit; latency is not. Warm reqB TTFT beats the cold
+re-prefill on every provider where eviction occurs, and the gap widens at longer
+idles: at 1800\,s (Table~\ref{tab:bands}) the keepalive cuts TTFT from
+$2.9$ to $1.5$\,s on Anthropic, $4.4$ to $1.3$\,s on OpenAI, and $5.4$ to
+$2.0$\,s on DeepSeek. For interactive agents this alone can justify the
+keepalive, and it is the whole case for DeepSeek, whose cost band is empty.
 
 \subsection{The operator's policy}
 Keep the cache warm across pauses whose length is bounded and plausibly reused
-(a tool call, an approval wait), at $\tau^{\ast}$; abandon the keepalive when
-the pause exceeds $I_{\max}$; use the paid long-TTL tier for hour-scale gaps;
+(a tool call, an approval wait), at $\tau^{\ast}$, but only inside the
+provider's paying band: longer than its eviction point and shorter than
+$I_{\max}$. Below the eviction point the baseline survives and the pings are
+waste; past $I_{\max}$ the pings exceed the re-prefill. Where the re-prefill is
+too cheap to insure (DeepSeek) or the cache never reliably evicts (Google), keep
+warm only for latency, not cost. Use the paid long-TTL tier for hour-scale gaps;
 never keep a dead session warm. This is the policy \texttt{pi} implements.
 
 \section{Discussion: rational adoption, and the provider response it forces}
@@ -411,10 +488,11 @@ short idles.
 per-run $p$-values are descriptive, and only across-run replication is claimed.
 \item \textbf{Google's quota.} Gemini cells were collected under a restrictive
 account request quota (1K requests/day, which keepalive blocks repeatedly
-exhausted): Google has two complete runs (peak evening and off-peak night) plus
-partial cells from two quota-killed runs, and its keepalive arm remains thin
-($n{=}3$--$6$ per cell). Its implicit cache also offers no affinity lever, so
-warm rates carry machine-lottery variance on top of the ordinary kind.
+exhausted): Google has two complete matrix runs (peak evening and off-peak
+night) and one interval-validation run, plus partial cells from two
+quota-killed runs; its keepalive arms remain thin ($n{=}3$--$7$ per cell). Its
+implicit cache also offers no affinity lever, so warm rates carry
+machine-lottery variance on top of the ordinary kind.
 \item \textbf{Price drift.} Dollar figures use July-2026 list prices; ratios
 and the form of the results are robust to drift.
 \item \textbf{Load.} Retention timescales are measured at the load one

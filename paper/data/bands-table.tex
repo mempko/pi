@@ -1,0 +1,22 @@
+\begin{table}[t]
+\centering\footnotesize
+\caption{The same $\tau^{\ast}{=}240$\,s keepalive as Table~\ref{tab:strategy},
+now at a \textbf{30-minute} pause (idle $1800$\,s, 100k prefix), where every evicting provider's baseline is fully
+cold. Marginal accounting: the pause decision only (cold \texttt{reqB} vs.\
+pings${}+{}$warm \texttt{reqB}); the sunk \texttt{reqA} is excluded. What lost
+money at 10 minutes on OpenAI (still warm, nothing to insure) wins here:
+inside its band the keepalive saves on Anthropic \emph{and} OpenAI, while
+DeepSeek's re-prefill stays too cheap to insure at any gap.}
+\label{tab:bands}
+\begin{tabular}{lrrrrr}
+\toprule
+ & \multicolumn{2}{c}{let die} & \multicolumn{2}{c}{keepalive} & saving \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Provider & warm & cost & warm & cost & (marginal) \\
+\midrule
+Anthropic & 0/8 & \$0.333 & 8/8 & \$0.214 & 1.56$\times$ \\
+OpenAI & 0/8 & \$0.104 & 8/8 & \$0.085 & 1.23$\times$ \\
+DeepSeek & 0/8 & \$0.022 & 8/8 & \$0.108 & 0.20$\times$ \\
+\bottomrule
+\end{tabular}
+\end{table}
